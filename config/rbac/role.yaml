@@ -1,0 +1,44 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dapla.ssb.no
+  resources:
+  - simpleproxyclients
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dapla.ssb.no
+  resources:
+  - simpleproxyclients/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dapla.ssb.no
+  resources:
+  - simpleproxyclients/status
+  verbs:
+  - get
+  - patch
+  - update

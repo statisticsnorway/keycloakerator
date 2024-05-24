@@ -1,0 +1,13 @@
+apiVersion: dapla.ssb.no/v1alpha1
+kind: SimpleProxyClient
+metadata:
+  labels:
+    app.kubernetes.io/name: keycloakerator
+    app.kubernetes.io/managed-by: kustomize
+  name: simpleproxyclient-sample
+  namespace: default
+spec:
+  realm: master
+  redirectUris: 
+  - http://test
+  targetSecret: llabababa

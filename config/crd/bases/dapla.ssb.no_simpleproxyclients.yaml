@@ -1,0 +1,68 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: simpleproxyclients.dapla.ssb.no
+spec:
+  group: dapla.ssb.no
+  names:
+    kind: SimpleProxyClient
+    listKind: SimpleProxyClientList
+    plural: simpleproxyclients
+    singular: simpleproxyclient
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SimpleProxyClient is the Schema for the simpleproxyclients API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SimpleProxyClientSpec defines the desired state of SimpleProxyClient
+            properties:
+              realm:
+                description: The target Keycloak realm.
+                type: string
+              redirectUris:
+                description: RedirectUris is the list of allowed redirect URIs (callback
+                  URIs) for this client.
+                items:
+                  type: string
+                minItems: 1
+                type: array
+              targetSecret:
+                description: TargetSecret is the name of the secret to create containing
+                  the client ID, client secret and cookie secret.
+                type: string
+            required:
+            - realm
+            - redirectUris
+            - targetSecret
+            type: object
+          status:
+            description: SimpleProxyClientStatus defines the observed state of SimpleProxyClient
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
