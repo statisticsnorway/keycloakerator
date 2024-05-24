@@ -110,14 +110,16 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 					log.Error(err, "could not delete keycloak client")
 					return ctrl.Result{}, err
 				}
+				log.Info("keycloak client deleted")
 			}
 
 			// We can now remove the finalizer, letting k8s remove the SimpleProxyClient instance
-			log.V(2).Info("removing finalizer")
+			log.V(1).Info("removing finalizer")
 			if err := r.removeFinalizer(ctx, instance); err != nil {
 				log.Error(err, "failed to remove finalizer")
 				return ctrl.Result{}, err
 			}
+			log.Info("finalizer removed")
 
 		}
 
@@ -282,12 +284,12 @@ func (r *SimpleProxyClientReconciler) addFinalizer(ctx context.Context, o client
 	return r.Update(ctx, o)
 }
 
-func (r *SimpleProxyClientReconciler) removeFinalizer(ctx context.Context, o client.Object) error {
-	if ok := controllerutil.RemoveFinalizer(o, finalizerName); !ok {
+func (r *SimpleProxyClientReconciler) removeFinalizer(ctx context.Context, instance *daplav1alpha1.SimpleProxyClient) error {
+	if ok := controllerutil.RemoveFinalizer(instance, finalizerName); !ok {
 		// This shouldn't really happen (we only call this function if the finalizer is present)
 		return nil
 	}
-	return r.Update(ctx, o)
+	return r.Update(ctx, instance)
 }
 
 func generateCookieSecret() (string, error) {

@@ -18,72 +18,66 @@ package controller
 
 import (
 	"context"
+	"time"
 
+	"github.com/Nerzal/gocloak/v13"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
+	"github.com/statisticsnorway/keycloakerator/api/v1alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	daplav1alpha1 "github.com/statisticsnorway/keycloakerator/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = Describe("SimpleProxyClient Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
 
-		ctx := context.Background()
+	const (
+		name         = "test-spc"
+		namespace    = "default"
+		realm        = "master"
+		redirectUri  = "http://test"
+		targetSecret = "my-secret"
+		timeout      = time.Second * 10
+		duration     = time.Second * 10
+		interval     = time.Millisecond * 250
+	)
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		simpleproxyclient := &daplav1alpha1.SimpleProxyClient{}
-
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind SimpleProxyClient")
-			err := k8sClient.Get(ctx, typeNamespacedName, simpleproxyclient)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &daplav1alpha1.SimpleProxyClient{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					Spec: daplav1alpha1.SimpleProxyClientSpec{
-						Realm:        "test",
-						RedirectUris: []string{"http://test"},
-						TargetSecret: "test",
-					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+	Context("When deleting a SimpleProxyClient", func() {
+		It("Should succeed even when the Keycloak client is missing", func() {
+			By("Creating a new SimpleProxyClient")
+			ctx := context.Background()
+			spc := &v1alpha1.SimpleProxyClient{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: v1alpha1.SimpleProxyClientSpec{
+					Realm:        realm,
+					RedirectUris: []string{redirectUri},
+					TargetSecret: targetSecret,
+				},
 			}
-		})
+			Expect(k8sClient.Create(ctx, spc)).Should(Succeed())
 
-		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &daplav1alpha1.SimpleProxyClient{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
+			By("Deleting all Keycloak clients")
+			kc.clients = []gocloak.Client{}
 
-			By("Cleanup the specific resource instance SimpleProxyClient")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &SimpleProxyClientReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				Keycloak: &KeycloakDummy{},
-			}
+			lookup := types.NamespacedName{Name: name, Namespace: namespace}
+			createdSPC := &v1alpha1.SimpleProxyClient{}
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, lookup, createdSPC)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting the SimpleProxyClient")
+			Expect(k8sClient.Delete(ctx, spc)).Should(Succeed())
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, lookup, createdSPC)
+				return apierrors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
+
 })
