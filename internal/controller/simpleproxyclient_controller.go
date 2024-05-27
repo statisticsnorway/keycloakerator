@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/Nerzal/gocloak/v13"
 	daplav1alpha1 "github.com/statisticsnorway/keycloakerator/api/v1alpha1"
@@ -42,6 +43,31 @@ type SimpleProxyClientReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Keycloak Keycloak
+}
+
+type SimpleProxyClientOption func(*SimpleProxyClientReconciler)
+
+func NewSimpleProxyClientReconciler(mgr manager.Manager, opts ...SimpleProxyClientOption) *SimpleProxyClientReconciler {
+	spc := &SimpleProxyClientReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}
+
+	for _, opt := range opts {
+		opt(spc)
+	}
+
+	return spc
+}
+
+func WithKeycloakDummy() SimpleProxyClientOption {
+	return WithKeycloak(&KeycloakDummy{})
+}
+
+func WithKeycloak(kc Keycloak) SimpleProxyClientOption {
+	return func(spcr *SimpleProxyClientReconciler) {
+		spcr.Keycloak = kc
+	}
 }
 
 type Keycloak interface {

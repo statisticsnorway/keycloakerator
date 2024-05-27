@@ -92,15 +92,6 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	// Read our custom enrivonment variables
-	config, err := env.ParseAsWithOptions[config](env.Options{
-		Prefix: "KEYCLOAKERATOR_",
-	})
-	if err != nil && os.Getenv("KEYCLOAKERATOR_DUMMY") != "yes" {
-		fmt.Printf("error parsing environment variables: %s", err)
-		os.Exit(1)
-	}
-
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -152,8 +143,18 @@ func main() {
 	}
 	ctx := ctrl.SetupSignalHandler()
 
-	var kc controller.Keycloak = &controller.KeycloakDummy{}
+	var ctrlOpts []controller.SimpleProxyClientOption
+
 	if os.Getenv("KEYCLOAKERATOR_DUMMY") != "yes" {
+		ctrlOpts = append(ctrlOpts, controller.WithKeycloakDummy())
+	} else {
+		config, err := env.ParseAsWithOptions[config](env.Options{
+			Prefix: "KEYCLOAKERATOR_",
+		})
+		if err != nil {
+			fmt.Printf("error parsing environment variables: %s", err)
+			os.Exit(1)
+		}
 		setupLog.Info("initializing GoCloak wrapper")
 
 		// The oauth2/clientcredentials package provides a TokenSource which keeps our Keycloak token
@@ -168,18 +169,15 @@ func main() {
 			).String(),
 		}
 
-		kc = &controller.GocloakWrapper{
+		kc := &controller.GocloakWrapper{
 			GoCloak:     gocloak.NewClient(config.KeycloakUrl.String()),
 			TokenSource: authConfig.TokenSource(ctx),
 		}
+		ctrlOpts = append(ctrlOpts, controller.WithKeycloak(kc))
 	}
 
 	// Set up our reconciler
-	if err = (&controller.SimpleProxyClientReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Keycloak: kc,
-	}).SetupWithManager(mgr); err != nil {
+	if err = controller.NewSimpleProxyClientReconciler(mgr, ctrlOpts...).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SimpleProxyClient")
 		os.Exit(1)
 	}
