@@ -168,9 +168,7 @@ func main() {
 
 	var ctrlOpts []controller.SimpleProxyClientOption
 
-	if cfg.KeycloakDummy {
-		ctrlOpts = append(ctrlOpts, controller.WithKeycloakDummy())
-	} else {
+	if !cfg.KeycloakDummy {
 		kcConfig := &keycloakConfig{}
 
 		if cfg.GCPSecret != "" {

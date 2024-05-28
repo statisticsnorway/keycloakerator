@@ -47,7 +47,6 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 		})
 	})
 
-
 	Context("When validating a non-changed spec", func() {
 		It("Should succeed", func() {
 			By("Sending in the same object")

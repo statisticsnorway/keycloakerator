@@ -49,8 +49,9 @@ type SimpleProxyClientOption func(*SimpleProxyClientReconciler)
 
 func NewSimpleProxyClientReconciler(mgr manager.Manager, opts ...SimpleProxyClientOption) *SimpleProxyClientReconciler {
 	spc := &SimpleProxyClientReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Keycloak: &KeycloakDummy{},
 	}
 
 	for _, opt := range opts {
