@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -25,7 +26,11 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"golang.org/x/oauth2/clientcredentials"
+	"gopkg.in/yaml.v3"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,19 +49,32 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
-// Our custom environment variables, using the caarlos0/env library
+// Config for the overall controller
 type config struct {
+	// Whether to use the dummy implementation of the Keycloak interface
+	KeycloakDummy bool `env:"KEYCLOAK_DUMMY"`
+
+	// If set, will try to populate keycloakConfig using this secret
+	GCPSecret string `env:"GCP_SECRET"`
+}
+
+// Config parameters for Keycloak
+type keycloakConfig struct {
 	// Keycloak Client ID
-	ClientId string `env:"CLIENT_ID,required,notEmpty"`
+	ClientId string `env:"CLIENT_ID,notEmpty" yaml:"client_id"`
 
 	// Keycloak Client Secret
-	ClientSecret string `env:"CLIENT_SECRET,required,notEmpty"`
+	ClientSecret string `env:"CLIENT_SECRET,notEmpty" yaml:"client_secret"`
 
 	// Realm of the above Keycloak client
-	ClientRealm string `env:"CLIENT_REALM,notEmpty" envDefault:"master"`
+	ClientRealm string `env:"CLIENT_REALM,notEmpty" envDefault:"master" yaml:"client_realm"`
 
 	// Base URL for the Keycloak instance
-	KeycloakUrl url.URL `env:"KEYCLOAK_URL,required,notEmpty"`
+	KeycloakUrl url.URL `env:"KEYCLOAK_URL,required,notEmpty" yaml:"-"`
+}
+
+func (kc *keycloakConfig) Valid() bool {
+	return kc.ClientId != "" && kc.ClientSecret != "" && kc.ClientRealm != "" && kc.KeycloakUrl.String() != ""
 }
 
 var (
@@ -143,34 +161,51 @@ func main() {
 	}
 	ctx := ctrl.SetupSignalHandler()
 
+	cfg, err := env.ParseAsWithOptions[config](env.Options{Prefix: "KEYCLOAKERATOR_"})
+	if err != nil {
+		setupLog.Error(err, "unable to parse general config from env")
+	}
+
 	var ctrlOpts []controller.SimpleProxyClientOption
 
-	if os.Getenv("KEYCLOAKERATOR_DUMMY") != "yes" {
-		ctrlOpts = append(ctrlOpts, controller.WithKeycloakDummy())
-	} else {
-		config, err := env.ParseAsWithOptions[config](env.Options{
+	if !cfg.KeycloakDummy {
+		kcConfig := &keycloakConfig{}
+
+		if cfg.GCPSecret != "" {
+			if err = readKeycloakConfigFromSecretManager(ctx, cfg.GCPSecret, kcConfig); err != nil {
+				setupLog.Error(err, "unable to fetch or parse config from secret manager")
+			}
+		}
+
+		err = env.ParseWithOptions(kcConfig, env.Options{
 			Prefix: "KEYCLOAKERATOR_",
 		})
 		if err != nil {
 			fmt.Printf("error parsing environment variables: %s", err)
 			os.Exit(1)
 		}
+
+		if !kcConfig.Valid() {
+			fmt.Print("missing one or more keycloak parameters")
+			os.Exit(1)
+		}
+
 		setupLog.Info("initializing GoCloak wrapper")
 
 		// The oauth2/clientcredentials package provides a TokenSource which keeps our Keycloak token
 		// up to date automatically.
 		authConfig := &clientcredentials.Config{
-			ClientID:     config.ClientId,
-			ClientSecret: config.ClientSecret,
-			TokenURL: config.KeycloakUrl.JoinPath(
+			ClientID:     kcConfig.ClientId,
+			ClientSecret: kcConfig.ClientSecret,
+			TokenURL: kcConfig.KeycloakUrl.JoinPath(
 				"realms",
-				config.ClientRealm,
+				kcConfig.ClientRealm,
 				"protocol/openid-connect/token",
 			).String(),
 		}
 
 		kc := &controller.GocloakWrapper{
-			GoCloak:     gocloak.NewClient(config.KeycloakUrl.String()),
+			GoCloak:     gocloak.NewClient(kcConfig.KeycloakUrl.String()),
 			TokenSource: authConfig.TokenSource(ctx),
 		}
 		ctrlOpts = append(ctrlOpts, controller.WithKeycloak(kc))
@@ -204,4 +239,22 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func readKeycloakConfigFromSecretManager(ctx context.Context, secret string, kc *keycloakConfig) error {
+	client, err := secretmanager.NewClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	req := &secretmanagerpb.AccessSecretVersionRequest{
+		Name: secret,
+	}
+	resp, err := client.AccessSecretVersion(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return yaml.Unmarshal(resp.GetPayload().GetData(), kc)
 }
