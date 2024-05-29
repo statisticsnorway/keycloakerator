@@ -161,7 +161,7 @@ func main() {
 	}
 	ctx := ctrl.SetupSignalHandler()
 
-	cfg, err := env.ParseAs[config]()
+	cfg, err := env.ParseAsWithOptions[config](env.Options{Prefix: "KEYCLOAKERATOR_"})
 	if err != nil {
 		setupLog.Error(err, "unable to parse general config from env")
 	}
