@@ -45,6 +45,12 @@ type SimpleProxyClientReconciler struct {
 	Keycloak Keycloak
 }
 
+const (
+	clientSecretKey = "client_secret"
+	clientIdKey     = "client_id"
+	cookieSecretKey = "cookie_secret"
+)
+
 type SimpleProxyClientOption func(*SimpleProxyClientReconciler)
 
 func NewSimpleProxyClientReconciler(mgr manager.Manager, opts ...SimpleProxyClientOption) *SimpleProxyClientReconciler {
@@ -197,8 +203,8 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			Annotations: make(map[string]string),
 		},
 		Data: map[string][]byte{
-			"clientId":     []byte(clientId),
-			"clientSecret": []byte(*clientSecret),
+			clientIdKey:     []byte(clientId),
+			clientSecretKey: []byte(*clientSecret),
 		},
 	}
 	secretLog := log.WithValues("secretName", instance.Spec.TargetSecret)
@@ -214,7 +220,7 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		k8sSecret.Data["cookieSecret"] = []byte(cookieSecret)
+		k8sSecret.Data[cookieSecretKey] = []byte(cookieSecret)
 		if err = r.Create(ctx, k8sSecret); err != nil {
 			secretLog.Error(err, "could not create secret")
 			return ctrl.Result{}, fmt.Errorf("create secret: %w", err)
@@ -227,12 +233,12 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	if !areClientCredentialsCorrect(foundSecret, k8sSecret) {
 		secretLog.Info("secret data diverges from wanted, updating with correct values")
-		if _, ok := k8sSecret.Data["cookieSecret"]; !ok {
+		if _, ok := k8sSecret.Data[cookieSecretKey]; !ok {
 			cookieSecret, err := generateCookieSecret()
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			k8sSecret.Data["cookieSecret"] = []byte(cookieSecret)
+			k8sSecret.Data[cookieSecretKey] = []byte(cookieSecret)
 		}
 
 		if err = r.Update(ctx, k8sSecret); err != nil {
@@ -267,10 +273,10 @@ func errorIs[T error](e error) bool {
 
 // areClientCredentialsCorrect reports whether the client ID and secret are correct
 func areClientCredentialsCorrect(found, want *corev1.Secret) bool {
-	if clientId, ok := found.Data["clientId"]; !ok || !bytes.Equal(clientId, want.Data["clientId"]) {
+	if clientId, ok := found.Data[clientIdKey]; !ok || !bytes.Equal(clientId, want.Data[clientIdKey]) {
 		return false
 	}
-	if clientSecret, ok := found.Data["clientSecret"]; !ok || !bytes.Equal(clientSecret, want.Data["clientSecret"]) {
+	if clientSecret, ok := found.Data[clientSecretKey]; !ok || !bytes.Equal(clientSecret, want.Data[clientSecretKey]) {
 		return false
 	}
 	return true
