@@ -17,7 +17,7 @@ type KeycloakDummy struct {
 	clients []gocloak.Client
 }
 
-func (d *KeycloakDummy) CreateClient(ctx context.Context, realm string, newClient gocloak.Client) (string, error) {
+func (d *KeycloakDummy) CreateClient(ctx context.Context, newClient gocloak.Client) (string, error) {
 	id := strconv.Itoa(len(d.clients))
 	newClient.ID = &id
 	hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", id, *(newClient.Name))))
@@ -27,7 +27,7 @@ func (d *KeycloakDummy) CreateClient(ctx context.Context, realm string, newClien
 	return id, nil
 }
 
-func (d *KeycloakDummy) GetClientByClientId(ctx context.Context, realm string, clientId string) (*gocloak.Client, error) {
+func (d *KeycloakDummy) GetClientByClientId(ctx context.Context, clientId string) (*gocloak.Client, error) {
 	for _, client := range d.clients {
 		if *client.ClientID == clientId {
 			return &client, nil
@@ -36,7 +36,7 @@ func (d *KeycloakDummy) GetClientByClientId(ctx context.Context, realm string, c
 	return nil, &ClientNotFoundError{ClientId: clientId}
 }
 
-func (d *KeycloakDummy) GetClient(ctx context.Context, realm, idOfClient string) (*gocloak.Client, error) {
+func (d *KeycloakDummy) GetClient(ctx context.Context, idOfClient string) (*gocloak.Client, error) {
 	id, err := strconv.Atoi(idOfClient)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (d *KeycloakDummy) GetClient(ctx context.Context, realm, idOfClient string)
 	return &d.clients[id], nil
 }
 
-func (d *KeycloakDummy) DeleteClient(ctx context.Context, realm, idOfClient string) error {
+func (d *KeycloakDummy) DeleteClient(ctx context.Context, idOfClient string) error {
 	id, err := strconv.Atoi(idOfClient)
 	if err != nil {
 		return err

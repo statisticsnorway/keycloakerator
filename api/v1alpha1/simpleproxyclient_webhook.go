@@ -67,8 +67,7 @@ func (r *SimpleProxyClient) ValidateUpdate(old runtime.Object) (admission.Warnin
 }
 
 func isSpecModified(old, new SimpleProxyClientSpec) bool {
-	return old.Realm != new.Realm ||
-		old.TargetSecret != new.TargetSecret ||
+	return old.SecretName != new.SecretName ||
 		!slices.Equal(old.RedirectUris, new.RedirectUris)
 }
 

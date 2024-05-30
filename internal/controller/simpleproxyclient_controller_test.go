@@ -52,9 +52,8 @@ var _ = Describe("SimpleProxyClient Controller", func() {
 					Namespace: namespace,
 				},
 				Spec: v1alpha1.SimpleProxyClientSpec{
-					Realm:        realm,
 					RedirectUris: []string{redirectUri},
-					TargetSecret: targetSecret,
+					SecretName:   targetSecret,
 				},
 			}
 			Expect(k8sClient.Create(ctx, spc)).Should(Succeed())

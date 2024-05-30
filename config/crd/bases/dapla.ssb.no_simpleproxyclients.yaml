@@ -39,9 +39,6 @@ spec:
           spec:
             description: SimpleProxyClientSpec defines the desired state of SimpleProxyClient
             properties:
-              realm:
-                description: The target Keycloak realm.
-                type: string
               redirectUris:
                 description: RedirectUris is the list of allowed redirect URIs (callback
                   URIs) for this client.
@@ -49,14 +46,13 @@ spec:
                   type: string
                 minItems: 1
                 type: array
-              targetSecret:
-                description: TargetSecret is the name of the secret to create containing
+              secretName:
+                description: SecretName is the name of the secret to create containing
                   the client ID, client secret and cookie secret.
                 type: string
             required:
-            - realm
             - redirectUris
-            - targetSecret
+            - secretName
             type: object
           status:
             description: SimpleProxyClientStatus defines the observed state of SimpleProxyClient

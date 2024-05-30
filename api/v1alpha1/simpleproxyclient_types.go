@@ -27,15 +27,12 @@ import (
 type SimpleProxyClientSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// The target Keycloak realm.
-	Realm string `json:"realm"`
-
 	// RedirectUris is the list of allowed redirect URIs (callback URIs) for this client.
 	// +kubebuilder:validation:MinItems=1
 	RedirectUris []string `json:"redirectUris"`
 
-	// TargetSecret is the name of the secret to create containing the client ID, client secret and cookie secret.
-	TargetSecret string `json:"targetSecret"`
+	// SecretName is the name of the secret to create containing the client ID, client secret and cookie secret.
+	SecretName string `json:"secretName"`
 }
 
 // SimpleProxyClientStatus defines the observed state of SimpleProxyClient

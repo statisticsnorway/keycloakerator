@@ -42,7 +42,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/Nerzal/gocloak/v13"
 	"github.com/caarlos0/env/v11"
 	daplav1alpha1 "github.com/statisticsnorway/keycloakerator/api/v1alpha1"
 	"github.com/statisticsnorway/keycloakerator/internal/controller"
@@ -61,13 +60,13 @@ type config struct {
 // Config parameters for Keycloak
 type keycloakConfig struct {
 	// Keycloak Client ID
-	ClientId string `env:"CLIENT_ID,notEmpty" yaml:"client_id"`
+	ClientId string `env:"CLIENT_ID" yaml:"client_id"`
 
 	// Keycloak Client Secret
-	ClientSecret string `env:"CLIENT_SECRET,notEmpty" yaml:"client_secret"`
+	ClientSecret string `env:"CLIENT_SECRET" yaml:"client_secret"`
 
 	// Realm of the above Keycloak client
-	ClientRealm string `env:"CLIENT_REALM,notEmpty" envDefault:"master" yaml:"client_realm"`
+	ClientRealm string `env:"CLIENT_REALM" yaml:"client_realm"`
 
 	// Base URL for the Keycloak instance
 	KeycloakUrl url.URL `env:"KEYCLOAK_URL,required,notEmpty" yaml:"-"`
@@ -204,10 +203,11 @@ func main() {
 			).String(),
 		}
 
-		kc := &controller.GocloakWrapper{
-			GoCloak:     gocloak.NewClient(kcConfig.KeycloakUrl.String()),
-			TokenSource: authConfig.TokenSource(ctx),
-		}
+		kc := controller.NewGocloakWrapper(
+			kcConfig.KeycloakUrl.String(),
+			kcConfig.ClientRealm,
+			authConfig.TokenSource(ctx),
+		)
 		ctrlOpts = append(ctrlOpts, controller.WithKeycloak(kc))
 	}
 

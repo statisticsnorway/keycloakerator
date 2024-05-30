@@ -26,17 +26,16 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 	DescribeTable("When modyfing fields in SimpleProxyClient under Validating Webhook", func(oldSpec SimpleProxyClientSpec) {
 		spc := &SimpleProxyClient{
 			Spec: SimpleProxyClientSpec{
-				Realm:        "test1",
 				RedirectUris: []string{"http://localhost1"},
-				TargetSecret: "test1",
+				SecretName:   "test1",
 			},
 		}
 		old := &SimpleProxyClient{Spec: oldSpec}
 		Expect(spc.ValidateUpdate(old)).Error().Should(HaveOccurred())
 	},
-		Entry("When Realm is changed", SimpleProxyClientSpec{Realm: "test2", RedirectUris: []string{"http://localhost1"}, TargetSecret: "test1"}),
-		Entry("When RedirectUris is changed", SimpleProxyClientSpec{Realm: "test1", RedirectUris: []string{"http://localhost2"}, TargetSecret: "test1"}),
-		Entry("When TargetSecret is changed", SimpleProxyClientSpec{Realm: "test1", RedirectUris: []string{"http://localhost1"}, TargetSecret: "test2"}),
+		Entry("When Realm is changed", SimpleProxyClientSpec{RedirectUris: []string{"http://localhost1"}, SecretName: "test1"}),
+		Entry("When RedirectUris is changed", SimpleProxyClientSpec{RedirectUris: []string{"http://localhost2"}, SecretName: "test1"}),
+		Entry("When TargetSecret is changed", SimpleProxyClientSpec{RedirectUris: []string{"http://localhost1"}, SecretName: "test2"}),
 	)
 
 	Context("When the wrong kind is sent to ValidateUpdate", func() {
@@ -63,8 +62,8 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 		Expect(spc.ValidateCreate()).Error().ShouldNot(HaveOccurred())
 	},
 		Entry("When spec is empty", SimpleProxyClientSpec{}),
-		Entry("When spec if filled", SimpleProxyClientSpec{Realm: "test", RedirectUris: []string{"http://test"}, TargetSecret: "test"}),
-		Entry("When spec is missing redirect URIs", SimpleProxyClientSpec{Realm: "test", TargetSecret: "test"}),
+		Entry("When spec if filled", SimpleProxyClientSpec{RedirectUris: []string{"http://test"}, SecretName: "test"}),
+		Entry("When spec is missing redirect URIs", SimpleProxyClientSpec{SecretName: "test"}),
 	)
 
 	DescribeTable("When deleting SimpleProxyClient under Validating Webhook", func(spec SimpleProxyClientSpec) {
@@ -75,8 +74,8 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 		Expect(spc.ValidateDelete()).Error().ShouldNot(HaveOccurred())
 	},
 		Entry("When spec is empty", SimpleProxyClientSpec{}),
-		Entry("When spec if filled", SimpleProxyClientSpec{Realm: "test", RedirectUris: []string{"http://test"}, TargetSecret: "test"}),
-		Entry("When spec is missing redirect URIs", SimpleProxyClientSpec{Realm: "test", TargetSecret: "test"}),
+		Entry("When spec if filled", SimpleProxyClientSpec{RedirectUris: []string{"http://test"}, SecretName: "test"}),
+		Entry("When spec is missing redirect URIs", SimpleProxyClientSpec{SecretName: "test"}),
 	)
 
 })

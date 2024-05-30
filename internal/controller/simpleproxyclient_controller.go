@@ -78,10 +78,10 @@ func WithKeycloak(kc Keycloak) SimpleProxyClientOption {
 }
 
 type Keycloak interface {
-	CreateClient(ctx context.Context, realm string, newClient gocloak.Client) (string, error)
-	GetClientByClientId(ctx context.Context, realm string, clientId string) (*gocloak.Client, error)
-	GetClient(ctx context.Context, realm, idOfClient string) (*gocloak.Client, error)
-	DeleteClient(ctx context.Context, realm, idOfClient string) error
+	CreateClient(ctx context.Context, newClient gocloak.Client) (string, error)
+	GetClientByClientId(ctx context.Context, clientId string) (*gocloak.Client, error)
+	GetClient(ctx context.Context, idOfClient string) (*gocloak.Client, error)
+	DeleteClient(ctx context.Context, idOfClient string) error
 }
 
 //+kubebuilder:rbac:groups=dapla.ssb.no,resources=simpleproxyclients,verbs=get;list;watch;create;update;patch;delete
@@ -132,14 +132,14 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if hasFinalizer(instance) {
 			log.V(2).Info("resource has finalizer, cleaning up resources and removing finalizer")
 			// Delete Keycloak client
-			client, err := r.Keycloak.GetClientByClientId(ctx, instance.Spec.Realm, clientId)
+			client, err := r.Keycloak.GetClientByClientId(ctx, clientId)
 
 			// If we can't find the client, we don't need to delete it
 			if err != nil && !errorIs[*ClientNotFoundError](err) {
 				return ctrl.Result{}, err
 			} else if err == nil {
 				log.Info("deleting keycloak client")
-				if err := r.Keycloak.DeleteClient(ctx, instance.Spec.Realm, *client.ID); err != nil {
+				if err := r.Keycloak.DeleteClient(ctx, *client.ID); err != nil {
 					log.Error(err, "could not delete keycloak client")
 					return ctrl.Result{}, err
 				}
@@ -160,16 +160,16 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, nil
 	}
 
-	client, err := r.Keycloak.GetClientByClientId(ctx, instance.Spec.Realm, clientId)
+	client, err := r.Keycloak.GetClientByClientId(ctx, clientId)
 
 	if errorIs[*ClientNotFoundError](err) {
 		log.Info("creating keycloak client")
-		clientInternalId, err := r.createClient(ctx, instance.Spec.Realm, clientId, instance.Spec.RedirectUris)
+		clientInternalId, err := r.createClient(ctx, clientId, instance.Spec.RedirectUris)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-		client, err = r.Keycloak.GetClient(ctx, instance.Spec.Realm, *clientInternalId)
+		client, err = r.Keycloak.GetClient(ctx, *clientInternalId)
 		if err != nil {
 			log.Error(err, "failed to get newly created client")
 			return ctrl.Result{}, err
@@ -197,7 +197,7 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	foundSecret := &corev1.Secret{}
 	k8sSecret := &corev1.Secret{
 		ObjectMeta: ctrl.ObjectMeta{
-			Name:        instance.Spec.TargetSecret,
+			Name:        instance.Spec.SecretName,
 			Namespace:   instance.Namespace,
 			Labels:      make(map[string]string),
 			Annotations: make(map[string]string),
@@ -207,13 +207,13 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			clientSecretKey: []byte(*clientSecret),
 		},
 	}
-	secretLog := log.WithValues("secretName", instance.Spec.TargetSecret)
+	secretLog := log.WithValues("secretName", instance.Spec.SecretName)
 	if err = controllerutil.SetControllerReference(instance, k8sSecret, r.Scheme); err != nil {
 		secretLog.Error(err, "failed to set controller reference on secret")
 		return ctrl.Result{}, err
 	}
 	if err = r.Get(ctx,
-		types.NamespacedName{Name: instance.Spec.TargetSecret, Namespace: instance.Namespace},
+		types.NamespacedName{Name: instance.Spec.SecretName, Namespace: instance.Namespace},
 		foundSecret); k8serr.IsNotFound(err) {
 		secretLog.Info("secret doesn't exist, creating it")
 		cookieSecret, err := generateCookieSecret()
@@ -282,10 +282,10 @@ func areClientCredentialsCorrect(found, want *corev1.Secret) bool {
 	return true
 }
 
-func (r *SimpleProxyClientReconciler) createClient(ctx context.Context, realm, clientId string, redirectUris []string) (*string, error) {
+func (r *SimpleProxyClientReconciler) createClient(ctx context.Context, clientId string, redirectUris []string) (*string, error) {
 	client := newClient(clientId, redirectUris)
 
-	clientInternalId, err := r.Keycloak.CreateClient(ctx, realm, client)
+	clientInternalId, err := r.Keycloak.CreateClient(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("create client: %w", err)
 	}

@@ -7,7 +7,6 @@ metadata:
   name: simpleproxyclient-sample
   namespace: default
 spec:
-  realm: master
-  redirectUris: 
-  - http://test
-  targetSecret: llabababa
+  redirectUris:
+    - http://test
+  secretName: llabababa
