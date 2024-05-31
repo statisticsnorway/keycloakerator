@@ -1,6 +1,7 @@
 # Keycloakerator
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/statisticsnorway/keycloakerator/blob/main/LICENSE.md)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
 
 ## Usage
 
@@ -43,8 +44,9 @@ This allows the release-please workflow to parse them and create a changelog.
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for its commit messages - **this also applies to squash merge messages**.
 You can check out the following resources for more explanation/motivation:
-[The power of conventional commits](https://julien.ponge.org/blog/the-power-of-conventional-commits/),
-[Conventional Commit Messages](https://gist.github.com/qoomon/5dfcdf8eec66a051ecd85625518cfd13),
+[The power of conventional commits](https://julien.ponge.org/blog/the-power-of-conventional-commits/)
+ and
+[Conventional Commit Messages](https://gist.github.com/qoomon/5dfcdf8eec66a051ecd85625518cfd13).
 
 When working on experimental branches you can use whatever commit messages you want, but you should either squash/amend your messages before merging your PR.
 Using [Scratchpad branches](https://julien.ponge.org/blog/a-workflow-for-experiments-in-git-scratchpad-branches/) is probably the easiest approach.
