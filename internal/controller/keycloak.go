@@ -41,6 +41,15 @@ func (g *GocloakWrapper) CreateClient(ctx context.Context, client gocloak.Client
 	return g.GoCloak.CreateClient(ctx, token.AccessToken, g.Realm, client)
 }
 
+func (g *GocloakWrapper) CreateClientProtocolMapper(ctx context.Context, idOfClient string, mapper gocloak.ProtocolMapperRepresentation) (string, error) {
+	token, err := g.TokenSource.Token()
+	if err != nil {
+		return "", fmt.Errorf("get token: %w", err)
+	}
+
+	return g.GoCloak.CreateClientProtocolMapper(ctx, token.AccessToken, g.Realm, idOfClient, mapper)
+}
+
 func (g *GocloakWrapper) GetClient(ctx context.Context, idOfClient string) (*gocloak.Client, error) {
 	token, err := g.TokenSource.Token()
 	if err != nil {

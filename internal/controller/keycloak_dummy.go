@@ -27,6 +27,10 @@ func (d *KeycloakDummy) CreateClient(ctx context.Context, newClient gocloak.Clie
 	return id, nil
 }
 
+func (d *KeycloakDummy) CreateClientProtocolMapper(ctx context.Context, idOfClient string, mapper gocloak.ProtocolMapperRepresentation) (string, error) {
+	return "", nil
+}
+
 func (d *KeycloakDummy) GetClientByClientId(ctx context.Context, clientId string) (*gocloak.Client, error) {
 	for _, client := range d.clients {
 		if *client.ClientID == clientId {

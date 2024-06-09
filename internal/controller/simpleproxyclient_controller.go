@@ -79,6 +79,7 @@ func WithKeycloak(kc Keycloak) SimpleProxyClientOption {
 
 type Keycloak interface {
 	CreateClient(ctx context.Context, newClient gocloak.Client) (string, error)
+	CreateClientProtocolMapper(ctx context.Context, idOfClient string, mapper gocloak.ProtocolMapperRepresentation) (string, error)
 	GetClientByClientId(ctx context.Context, clientId string) (*gocloak.Client, error)
 	GetClient(ctx context.Context, idOfClient string) (*gocloak.Client, error)
 	DeleteClient(ctx context.Context, idOfClient string) error
@@ -290,6 +291,22 @@ func (r *SimpleProxyClientReconciler) createClient(ctx context.Context, clientId
 		return nil, fmt.Errorf("create client: %w", err)
 	}
 
+	clientAudience := gocloak.ProtocolMapperRepresentation{
+		Name:           ptr(""),
+		Protocol:       ptr("openid-connect"),
+		ProtocolMapper: ptr("oidc-audience-mapper"),
+		Config: &map[string]string{
+			"id.token.claim":           "true",
+			"access.token.claim":       "true",
+			"included.custom.audience": clientId,
+		},
+	}
+
+	_, err = r.Keycloak.CreateClientProtocolMapper(ctx, clientInternalId, clientAudience)
+	if err != nil {
+		return nil, fmt.Errorf("create audience mapper: %w", err)
+	}
+
 	return &clientInternalId, nil
 }
 
@@ -302,6 +319,12 @@ func newClient(clientId string, redirectUris []string) gocloak.Client {
 		Enabled:      ptr(true),
 		PublicClient: ptr(false),
 		RedirectURIs: &redirectUris,
+		DefaultClientScopes: &[]string{
+			"email",
+			"profile",
+			"roles",
+			"web-origins",
+		},
 	}
 }
 
