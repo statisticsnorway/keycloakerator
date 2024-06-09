@@ -46,9 +46,9 @@ type SimpleProxyClientReconciler struct {
 }
 
 const (
-	clientSecretKey = "client_secret"
-	clientIdKey     = "client_id"
-	cookieSecretKey = "cookie_secret"
+	clientSecretKey = "client-secret"
+	clientIdKey     = "client-id"
+	cookieSecretKey = "cookie-secret"
 )
 
 type SimpleProxyClientOption func(*SimpleProxyClientReconciler)
