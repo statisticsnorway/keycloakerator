@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/statisticsnorway/keycloakerator/compare/v0.1.0...v0.2.0) (2024-06-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* use hyphens in secret keys\n\nBREAKING-CHANGES: secrets no longer use underscores in keys
+
+### Features
+
+* use hyphens in secret keys\n\nBREAKING-CHANGES: secrets no longer use underscores in keys ([848a122](https://github.com/statisticsnorway/keycloakerator/commit/848a122b4eb964e44905122d919a6bbf955b309f))
+
 ## [0.1.0](https://github.com/statisticsnorway/keycloakerator/compare/v0.0.1...v0.1.0) (2024-05-31)
 
 
