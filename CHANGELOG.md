@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/statisticsnorway/keycloakerator/compare/v0.2.0...v0.2.1) (2024-06-10)
+
+
+### Bug Fixes
+
+* create protocol mapper for client audience ([#9](https://github.com/statisticsnorway/keycloakerator/issues/9)) ([acdeffd](https://github.com/statisticsnorway/keycloakerator/commit/acdeffd1fa4edde9e0ba9135492834aefa5939c4))
+
 ## [0.2.0](https://github.com/statisticsnorway/keycloakerator/compare/v0.1.0...v0.2.0) (2024-06-09)
 
 
