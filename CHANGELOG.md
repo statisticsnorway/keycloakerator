@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/statisticsnorway/keycloakerator/compare/v0.2.1...v0.2.2) (2024-11-29)
+
+
+### Bug Fixes
+
+* adjusting memory keycloakerator manager ([#14](https://github.com/statisticsnorway/keycloakerator/issues/14)) ([ee9f370](https://github.com/statisticsnorway/keycloakerator/commit/ee9f370d4f1db5e37d957bef0ddb5868b08584c1))
+
 ## [0.2.1](https://github.com/statisticsnorway/keycloakerator/compare/v0.2.0...v0.2.1) (2024-06-10)
 
 
