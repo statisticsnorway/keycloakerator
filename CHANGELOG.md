@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/statisticsnorway/keycloakerator/compare/v0.2.2...v0.2.3) (2024-12-09)
+
+
+### Bug Fixes
+
+* bump memory because OOMKilled ([#17](https://github.com/statisticsnorway/keycloakerator/issues/17)) ([aadf617](https://github.com/statisticsnorway/keycloakerator/commit/aadf617cca5b8b9ff6df4aa716f9668d4d694e05))
+
 ## [0.2.2](https://github.com/statisticsnorway/keycloakerator/compare/v0.2.1...v0.2.2) (2024-11-29)
 
 
