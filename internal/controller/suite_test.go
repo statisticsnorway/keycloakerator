@@ -47,7 +47,7 @@ var (
 	testEnv   *envtest.Environment
 	ctx       context.Context
 	cancel    context.CancelFunc
-	kc        *KeycloakDummy
+	kc        *OidcDummy
 )
 
 func TestControllers(t *testing.T) {
@@ -95,13 +95,9 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	kc = &KeycloakDummy{}
+	kc = &OidcDummy{}
 
-	err = (&SimpleProxyClientReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Keycloak: kc,
-	}).SetupWithManager(k8sManager)
+	err = NewSimpleProxyClientReconciler(k8sManager, kc).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {

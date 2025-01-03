@@ -34,15 +34,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/Nerzal/gocloak/v13"
 	daplav1alpha1 "github.com/statisticsnorway/keycloakerator/api/v1alpha1"
 )
 
 // SimpleProxyClientReconciler reconciles a SimpleProxyClient object
 type SimpleProxyClientReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Keycloak Keycloak
+	Scheme      *runtime.Scheme
+	oidcService OIDCService
 }
 
 const (
@@ -51,38 +50,14 @@ const (
 	cookieSecretKey = "cookie-secret"
 )
 
-type SimpleProxyClientOption func(*SimpleProxyClientReconciler)
-
-func NewSimpleProxyClientReconciler(mgr manager.Manager, opts ...SimpleProxyClientOption) *SimpleProxyClientReconciler {
+func NewSimpleProxyClientReconciler(mgr manager.Manager, oidcService OIDCService) *SimpleProxyClientReconciler {
 	spc := &SimpleProxyClientReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Keycloak: &KeycloakDummy{},
-	}
-
-	for _, opt := range opts {
-		opt(spc)
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		oidcService: oidcService,
 	}
 
 	return spc
-}
-
-func WithKeycloakDummy() SimpleProxyClientOption {
-	return WithKeycloak(&KeycloakDummy{})
-}
-
-func WithKeycloak(kc Keycloak) SimpleProxyClientOption {
-	return func(spcr *SimpleProxyClientReconciler) {
-		spcr.Keycloak = kc
-	}
-}
-
-type Keycloak interface {
-	CreateClient(ctx context.Context, newClient gocloak.Client) (string, error)
-	CreateClientProtocolMapper(ctx context.Context, idOfClient string, mapper gocloak.ProtocolMapperRepresentation) (string, error)
-	GetClientByClientId(ctx context.Context, clientId string) (*gocloak.Client, error)
-	GetClient(ctx context.Context, idOfClient string) (*gocloak.Client, error)
-	DeleteClient(ctx context.Context, idOfClient string) error
 }
 
 //+kubebuilder:rbac:groups=dapla.ssb.no,resources=simpleproxyclients,verbs=get;list;watch;create;update;patch;delete
@@ -109,7 +84,6 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Retrieve the SimpleProxyClient instance being reconciled
 	instance := &daplav1alpha1.SimpleProxyClient{}
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
-		log.Info("could not get instance, possibly being deleted", "error", err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -122,81 +96,115 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	const clientIdFormat = "%s-%s"
-	clientId := fmt.Sprintf(clientIdFormat, req.Namespace, req.Name)
+	clientId := toClientId(req.Name, req.Namespace)
 	log = log.WithValues("clientId", clientId)
 
 	// If the instance is being deleted, we need to delete the Keycloak client first.
 	// The Secret is automatically garbage collected through its ownerReference.
 	if !instance.GetDeletionTimestamp().IsZero() {
 		log.V(2).Info("resource is being deleted")
-		if hasFinalizer(instance) {
-			log.V(2).Info("resource has finalizer, cleaning up resources and removing finalizer")
-			// Delete Keycloak client
-			client, err := r.Keycloak.GetClientByClientId(ctx, clientId)
-
-			// If we can't find the client, we don't need to delete it
-			if err != nil && !errorIs[*ClientNotFoundError](err) {
-				return ctrl.Result{}, err
-			} else if err == nil {
-				log.Info("deleting keycloak client")
-				if err := r.Keycloak.DeleteClient(ctx, *client.ID); err != nil {
-					log.Error(err, "could not delete keycloak client")
-					return ctrl.Result{}, err
-				}
-				log.Info("keycloak client deleted")
-			}
-
-			// We can now remove the finalizer, letting k8s remove the SimpleProxyClient instance
-			log.V(1).Info("removing finalizer")
-			if err := r.removeFinalizer(ctx, instance); err != nil {
-				log.Error(err, "failed to remove finalizer")
-				return ctrl.Result{}, err
-			}
-			log.Info("finalizer removed")
-
+		if !hasFinalizer(instance) {
+			return ctrl.Result{}, nil
 		}
 
-		// Instance is being deleted, we don't need to run the rest of the reconcile logic.
+		log.V(2).Info("resource has finalizer, cleaning up resources and removing finalizer")
+		if err := r.deleteKeycloakClient(ctx, clientId); err != nil {
+			log.Error(err, "failed to delete keycloak client")
+			return ctrl.Result{}, err
+		}
+
+		// We can now remove the finalizer, letting k8s remove the SimpleProxyClient instance
+		log.V(1).Info("removing finalizer")
+		if err := r.removeFinalizer(ctx, instance); err != nil {
+			log.Error(err, "failed to remove finalizer")
+			return ctrl.Result{}, err
+		}
+		log.Info("finalizer removed")
 		return ctrl.Result{}, nil
 	}
 
-	client, err := r.Keycloak.GetClientByClientId(ctx, clientId)
+	client, err := r.oidcService.GetClient(ctx, GetClientRequest{
+		Name: clientId,
+	})
 
-	if errorIs[*ClientNotFoundError](err) {
+	if errors.Is(err, ErrNotFound) {
 		log.Info("creating keycloak client")
-		clientInternalId, err := r.createClient(ctx, clientId, instance.Spec.RedirectUris)
-		if err != nil {
-			return ctrl.Result{}, err
+		if client, err = r.oidcService.CreateClient(ctx, CreateClientRequest{
+			Name:         clientId,
+			RedirectURIs: instance.Spec.RedirectUris,
+		}); err != nil {
+			log.Error(err, "could not create oidc client")
+			return ctrl.Result{}, fmt.Errorf("create client: %w", err)
 		}
+	} else if err != nil {
+		log.Error(err, "could not retrieve client info")
+		return ctrl.Result{}, fmt.Errorf("get client: %w", err)
+	}
 
-		client, err = r.Keycloak.GetClient(ctx, *clientInternalId)
-		if err != nil {
-			log.Error(err, "failed to get newly created client")
+	secret := &corev1.Secret{}
+	secretLog := log.WithValues("secretName", instance.Spec.SecretName)
+	if err = r.Get(ctx,
+		types.NamespacedName{Name: instance.Spec.SecretName, Namespace: instance.Namespace},
+		secret); k8serr.IsNotFound(err) {
+		secretLog.Info("secret doesn't exist, creating it")
+
+		if err := r.createKubernetesSecret(ctx, instance, *client); err != nil {
+			log.Error(err, "could not create kubernetes secret")
 			return ctrl.Result{}, err
 		}
+		return ctrl.Result{}, nil
 
 	} else if err != nil {
-		log.Error(err, "unexpected error getting client info (auth/connectivity issues with keycloak?)")
-		return ctrl.Result{}, fmt.Errorf("get client: %w", err)
-	} else if client.ID == nil {
-		log.Error(err, "successfully retrieved client, but its client ID is missing")
-		return ctrl.Result{}, fmt.Errorf("client internal ID for %q is nil (this should be impossible)", clientId)
+		secretLog.Error(err, "could not get kubernetes secret")
+		return ctrl.Result{}, fmt.Errorf("get secret: %w", err)
 	}
 
-	if client == nil {
-		log.Error(errors.New("client is nil"), "client was successfully retrieved or created, but client is nil (impossible?)")
-		return ctrl.Result{}, fmt.Errorf("client for %q is nil (this should be impossible)", clientId)
+	update := false
+	if !areClientCredentialsCorrect(secret, *client) {
+		secretLog.Info("secret data diverges from wanted, updating with correct values")
+		if _, ok := secret.Data[cookieSecretKey]; !ok {
+			cookieSecret, err := generateCookieSecret()
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			secret.Data[cookieSecretKey] = []byte(cookieSecret)
+		}
+		secret.Data[clientIdKey] = []byte(client.ClientID)
+		secret.Data[clientSecretKey] = []byte(client.ClientSecret)
+		update = true
 	}
 
-	if client.Secret == nil {
-		log.Error(errors.New("client missing secret value"), "client exists, but is missing a client secret")
-		return ctrl.Result{}, errors.New("client secret is nil")
+	if !controllerutil.HasControllerReference(secret) {
+		if err := controllerutil.SetControllerReference(instance, secret, r.Scheme); err != nil {
+			log.Error(err, "could not set controller reference")
+			return ctrl.Result{}, err
+		}
+		update = true
 	}
-	clientSecret := client.Secret
 
-	foundSecret := &corev1.Secret{}
-	k8sSecret := &corev1.Secret{
+	if update {
+		return ctrl.Result{}, r.Update(ctx, secret)
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *SimpleProxyClientReconciler) deleteKeycloakClient(ctx context.Context, clientId string) error {
+	if err := r.oidcService.DeleteClient(ctx, DeleteClientRequest{
+		Name: clientId,
+	}); !errors.Is(err, ErrNotFound) {
+		return err
+	}
+
+	return nil
+}
+
+func (r *SimpleProxyClientReconciler) createKubernetesSecret(ctx context.Context, instance *daplav1alpha1.SimpleProxyClient, client Client) error {
+	cookieSecret, err := generateCookieSecret()
+	if err != nil {
+		return err
+	}
+	secret := corev1.Secret{
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:        instance.Spec.SecretName,
 			Namespace:   instance.Namespace,
@@ -204,128 +212,31 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			Annotations: make(map[string]string),
 		},
 		Data: map[string][]byte{
-			clientIdKey:     []byte(clientId),
-			clientSecretKey: []byte(*clientSecret),
+			cookieSecretKey: []byte(cookieSecret),
+			clientIdKey:     []byte(client.ClientID),
+			clientSecretKey: []byte(client.ClientSecret),
 		},
 	}
-	secretLog := log.WithValues("secretName", instance.Spec.SecretName)
-	if err = controllerutil.SetControllerReference(instance, k8sSecret, r.Scheme); err != nil {
-		secretLog.Error(err, "failed to set controller reference on secret")
-		return ctrl.Result{}, err
+	if err = controllerutil.SetControllerReference(instance, &secret, r.Scheme); err != nil {
+		return err
 	}
-	if err = r.Get(ctx,
-		types.NamespacedName{Name: instance.Spec.SecretName, Namespace: instance.Namespace},
-		foundSecret); k8serr.IsNotFound(err) {
-		secretLog.Info("secret doesn't exist, creating it")
-		cookieSecret, err := generateCookieSecret()
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		k8sSecret.Data[cookieSecretKey] = []byte(cookieSecret)
-		if err = r.Create(ctx, k8sSecret); err != nil {
-			secretLog.Error(err, "could not create secret")
-			return ctrl.Result{}, fmt.Errorf("create secret: %w", err)
-		}
-		return ctrl.Result{}, nil
-	} else if err != nil {
-		secretLog.Error(err, "unexpected error getting secret")
-		return ctrl.Result{}, fmt.Errorf("get secret: %w", err)
-	}
-
-	if !areClientCredentialsCorrect(foundSecret, k8sSecret) {
-		secretLog.Info("secret data diverges from wanted, updating with correct values")
-		if _, ok := k8sSecret.Data[cookieSecretKey]; !ok {
-			cookieSecret, err := generateCookieSecret()
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			k8sSecret.Data[cookieSecretKey] = []byte(cookieSecret)
-		}
-
-		if err = r.Update(ctx, k8sSecret); err != nil {
-			secretLog.Error(err, "could not update secret")
-			return ctrl.Result{}, fmt.Errorf("update secret: %w", err)
-		}
-	}
-
-	return ctrl.Result{}, nil
-}
-
-// Disgusting workaround to not being able to take references of primitives.
-// Needed for gocloak.Client literal.
-func ptr[T any](t T) *T {
-	return &t
-}
-
-// errorIs is a convenience function for checking if an error is a specific custom error type
-//
-// Instead of checking the usual way,
-//
-//	var customErr *CustomError
-//	if errors.As(e, customErr) {}
-//
-// you can use
-//
-//	if errorIs[CustomError](err) {}
-func errorIs[T error](e error) bool {
-	tErr := new(T)
-	return errors.As(e, tErr)
+	return r.Create(ctx, &secret)
 }
 
 // areClientCredentialsCorrect reports whether the client ID and secret are correct
-func areClientCredentialsCorrect(found, want *corev1.Secret) bool {
-	if clientId, ok := found.Data[clientIdKey]; !ok || !bytes.Equal(clientId, want.Data[clientIdKey]) {
+func areClientCredentialsCorrect(have *corev1.Secret, client Client) bool {
+	if clientId, ok := have.Data[clientIdKey]; !ok || !bytes.Equal(clientId, []byte(client.ClientID)) {
 		return false
 	}
-	if clientSecret, ok := found.Data[clientSecretKey]; !ok || !bytes.Equal(clientSecret, want.Data[clientSecretKey]) {
+	if clientSecret, ok := have.Data[clientSecretKey]; !ok || !bytes.Equal(clientSecret, []byte(client.ClientSecret)) {
 		return false
 	}
 	return true
 }
 
-func (r *SimpleProxyClientReconciler) createClient(ctx context.Context, clientId string, redirectUris []string) (*string, error) {
-	client := newClient(clientId, redirectUris)
-
-	clientInternalId, err := r.Keycloak.CreateClient(ctx, client)
-	if err != nil {
-		return nil, fmt.Errorf("create client: %w", err)
-	}
-
-	clientAudience := gocloak.ProtocolMapperRepresentation{
-		Name:           ptr(""),
-		Protocol:       ptr("openid-connect"),
-		ProtocolMapper: ptr("oidc-audience-mapper"),
-		Config: &map[string]string{
-			"id.token.claim":           "true",
-			"access.token.claim":       "true",
-			"included.custom.audience": clientId,
-		},
-	}
-
-	_, err = r.Keycloak.CreateClientProtocolMapper(ctx, clientInternalId, clientAudience)
-	if err != nil {
-		return nil, fmt.Errorf("create audience mapper: %w", err)
-	}
-
-	return &clientInternalId, nil
-}
-
-// newClient is a convenience function to create a gocloak.Client instance
-// with our desired defaults.
-func newClient(clientId string, redirectUris []string) gocloak.Client {
-	return gocloak.Client{
-		ClientID:     &clientId,
-		Name:         &clientId,
-		Enabled:      ptr(true),
-		PublicClient: ptr(false),
-		RedirectURIs: &redirectUris,
-		DefaultClientScopes: &[]string{
-			"email",
-			"profile",
-			"roles",
-			"web-origins",
-		},
-	}
+func toClientId(name, namespace string) string {
+	const clientIdFormat = "%s-%s"
+	return fmt.Sprintf(clientIdFormat, namespace, name)
 }
 
 func hasFinalizer(o client.Object) bool {
