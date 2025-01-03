@@ -26,7 +26,7 @@ func (d *OidcDummy) CreateClient(ctx context.Context, req CreateClientRequest) (
 
 func (d *OidcDummy) GetClient(ctx context.Context, req GetClientRequest) (*Client, error) {
 	d.mu.RLock()
-	defer d.mu.Unlock()
+	defer d.mu.RUnlock()
 	if client, ok := d.clients[req.Name]; ok {
 		return &client, nil
 	}
