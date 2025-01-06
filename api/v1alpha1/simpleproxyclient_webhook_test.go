@@ -33,7 +33,6 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 		old := &SimpleProxyClient{Spec: oldSpec}
 		Expect(spc.ValidateUpdate(old)).Error().Should(HaveOccurred())
 	},
-		Entry("When Realm is changed", SimpleProxyClientSpec{RedirectUris: []string{"http://localhost1"}, SecretName: "test1"}),
 		Entry("When RedirectUris is changed", SimpleProxyClientSpec{RedirectUris: []string{"http://localhost2"}, SecretName: "test1"}),
 		Entry("When TargetSecret is changed", SimpleProxyClientSpec{RedirectUris: []string{"http://localhost1"}, SecretName: "test2"}),
 	)
