@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: keycloakerator
+  title: Keycloakerator
+  description: |
+    Dynamic Keycloak client provisioning through Kubernetes CRDs
+  annotations:
+    github.com/project-slug: statisticsnorway/keycloakerator
+spec:
+  type: service
+  owner: dapla-skyinfra-developers
+  lifecycle: production
+  system: keycloak
