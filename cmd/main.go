@@ -45,6 +45,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	daplav1alpha1 "github.com/statisticsnorway/keycloakerator/api/v1alpha1"
 	"github.com/statisticsnorway/keycloakerator/internal/controller"
+	"github.com/statisticsnorway/keycloakerator/internal/keycloak"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -165,8 +166,7 @@ func main() {
 		setupLog.Error(err, "unable to parse general config from env")
 	}
 
-	var ctrlOpts []controller.SimpleProxyClientOption
-
+	var oidcService controller.OIDCService = &controller.OidcDummy{}
 	if !cfg.KeycloakDummy {
 		kcConfig := &keycloakConfig{}
 
@@ -203,16 +203,15 @@ func main() {
 			).String(),
 		}
 
-		kc := controller.NewGocloakWrapper(
+		oidcService = keycloak.NewGocloakWrapper(
 			kcConfig.KeycloakUrl.String(),
 			kcConfig.ClientRealm,
 			authConfig.TokenSource(ctx),
 		)
-		ctrlOpts = append(ctrlOpts, controller.WithKeycloak(kc))
 	}
 
 	// Set up our reconciler
-	if err = controller.NewSimpleProxyClientReconciler(mgr, ctrlOpts...).SetupWithManager(mgr); err != nil {
+	if err = controller.NewSimpleProxyClientReconciler(mgr, oidcService).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SimpleProxyClient")
 		os.Exit(1)
 	}

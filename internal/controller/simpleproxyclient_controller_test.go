@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/Nerzal/gocloak/v13"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/statisticsnorway/keycloakerator/api/v1alpha1"
@@ -58,9 +57,6 @@ var _ = Describe("SimpleProxyClient Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, spc)).Should(Succeed())
 
-			By("Deleting all Keycloak clients")
-			kc.clients = []gocloak.Client{}
-
 			lookup := types.NamespacedName{Name: name, Namespace: namespace}
 			createdSPC := &v1alpha1.SimpleProxyClient{}
 
@@ -68,6 +64,9 @@ var _ = Describe("SimpleProxyClient Controller", func() {
 				err := k8sClient.Get(ctx, lookup, createdSPC)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
+
+			By("Deleting all Keycloak clients")
+			kc.clients = make(map[string]Client)
 
 			By("Deleting the SimpleProxyClient")
 			Expect(k8sClient.Delete(ctx, spc)).Should(Succeed())

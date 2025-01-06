@@ -2,63 +2,43 @@ package controller
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
-	"errors"
-	"fmt"
+	"math/rand"
 	"strconv"
-
-	"github.com/Nerzal/gocloak/v13"
+	"sync"
 )
 
-var _ Keycloak = (*KeycloakDummy)(nil)
-
-type KeycloakDummy struct {
-	clients []gocloak.Client
+type OidcDummy struct {
+	mu      sync.RWMutex
+	clients map[string]Client
 }
 
-func (d *KeycloakDummy) CreateClient(ctx context.Context, newClient gocloak.Client) (string, error) {
-	id := strconv.Itoa(len(d.clients))
-	newClient.ID = &id
-	hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", id, *(newClient.Name))))
-	secret := hex.EncodeToString(hash[:])
-	newClient.Secret = &secret
-	d.clients = append(d.clients, newClient)
-	return id, nil
+func (d *OidcDummy) CreateClient(ctx context.Context, req CreateClientRequest) (*Client, error) {
+	secret := strconv.Itoa(rand.Int())
+	client := Client{
+		ClientID:     req.Name,
+		ClientSecret: secret,
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.clients[req.Name] = client
+	return &client, nil
 }
 
-func (d *KeycloakDummy) CreateClientProtocolMapper(ctx context.Context, idOfClient string, mapper gocloak.ProtocolMapperRepresentation) (string, error) {
-	return "", nil
+func (d *OidcDummy) GetClient(ctx context.Context, req GetClientRequest) (*Client, error) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	if client, ok := d.clients[req.Name]; ok {
+		return &client, nil
+	}
+	return nil, ErrNotFound
 }
 
-func (d *KeycloakDummy) GetClientByClientId(ctx context.Context, clientId string) (*gocloak.Client, error) {
-	for _, client := range d.clients {
-		if *client.ClientID == clientId {
-			return &client, nil
-		}
+func (d *OidcDummy) DeleteClient(ctx context.Context, req DeleteClientRequest) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if _, ok := d.clients[req.Name]; ok {
+		delete(d.clients, req.Name)
+		return nil
 	}
-	return nil, &ClientNotFoundError{ClientId: clientId}
-}
-
-func (d *KeycloakDummy) GetClient(ctx context.Context, idOfClient string) (*gocloak.Client, error) {
-	id, err := strconv.Atoi(idOfClient)
-	if err != nil {
-		return nil, err
-	}
-	if id < 0 || id >= len(d.clients) {
-		return nil, fmt.Errorf("invalid dummy client ID %d", id)
-	}
-	return &d.clients[id], nil
-}
-
-func (d *KeycloakDummy) DeleteClient(ctx context.Context, idOfClient string) error {
-	id, err := strconv.Atoi(idOfClient)
-	if err != nil {
-		return err
-	}
-	if id < 0 || id >= len(d.clients) {
-		return errors.New("invalid dummy client ID")
-	}
-	d.clients = append(d.clients[:id], d.clients[id+1:]...)
-	return nil
+	return ErrNotFound
 }
