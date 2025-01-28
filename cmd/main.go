@@ -52,7 +52,7 @@ import (
 // Config for the overall controller
 type config struct {
 	// Whether to use the dummy implementation of the Keycloak interface
-	KeycloakDummy bool `env:"KEYCLOAK_DUMMY"`
+	KeycloakProvider string `env:"KEYCLOAK_PROVIDER"`
 
 	// If set, will try to populate keycloakConfig using this secret
 	GCPSecret string `env:"GCP_SECRET"`
@@ -164,50 +164,13 @@ func main() {
 	cfg, err := env.ParseAsWithOptions[config](env.Options{Prefix: "KEYCLOAKERATOR_"})
 	if err != nil {
 		setupLog.Error(err, "unable to parse general config from env")
+		os.Exit(1)
 	}
 
-	var oidcService controller.OIDCService = &controller.OidcDummy{}
-	if !cfg.KeycloakDummy {
-		kcConfig := &keycloakConfig{}
-
-		if cfg.GCPSecret != "" {
-			if err = readKeycloakConfigFromSecretManager(ctx, cfg.GCPSecret, kcConfig); err != nil {
-				setupLog.Error(err, "unable to fetch or parse config from secret manager")
-			}
-		}
-
-		err = env.ParseWithOptions(kcConfig, env.Options{
-			Prefix: "KEYCLOAKERATOR_",
-		})
-		if err != nil {
-			fmt.Printf("error parsing environment variables: %s", err)
-			os.Exit(1)
-		}
-
-		if !kcConfig.Valid() {
-			fmt.Print("missing one or more keycloak parameters")
-			os.Exit(1)
-		}
-
-		setupLog.Info("initializing GoCloak wrapper")
-
-		// The oauth2/clientcredentials package provides a TokenSource which keeps our Keycloak token
-		// up to date automatically.
-		authConfig := &clientcredentials.Config{
-			ClientID:     kcConfig.ClientId,
-			ClientSecret: kcConfig.ClientSecret,
-			TokenURL: kcConfig.KeycloakUrl.JoinPath(
-				"realms",
-				kcConfig.ClientRealm,
-				"protocol/openid-connect/token",
-			).String(),
-		}
-
-		oidcService = keycloak.NewGocloakWrapper(
-			kcConfig.KeycloakUrl.String(),
-			kcConfig.ClientRealm,
-			authConfig.TokenSource(ctx),
-		)
+	oidcService, err := initKeycloakProvider(ctx, cfg)
+	if err != nil {
+		setupLog.Error(err, "unable to initialize keycloak provider")
+		os.Exit(1)
 	}
 
 	// Set up our reconciler
@@ -256,4 +219,78 @@ func readKeycloakConfigFromSecretManager(ctx context.Context, secret string, kc 
 	}
 
 	return yaml.Unmarshal(resp.GetPayload().GetData(), kc)
+}
+
+func initKeycloakProvider(ctx context.Context, cfg config) (controller.OIDCService, error) {
+	switch cfg.KeycloakProvider {
+	case "dummy":
+		return &controller.OidcDummy{}, nil
+	case "gocloak":
+		return gocloakProvider(ctx, cfg)
+	case "terraform":
+		return terraformProvider(ctx, cfg)
+	default:
+		return nil, fmt.Errorf("unknown keycloak provider %q", cfg.KeycloakProvider)
+	}
+}
+
+func terraformProvider(ctx context.Context, cfg config) (controller.OIDCService, error) {
+	kcConfig, err := getKeycloakConfig(ctx, cfg.GCPSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	return keycloak.NewTerraformProviderWrapper(ctx,
+		kcConfig.KeycloakUrl.String(),
+		kcConfig.ClientId,
+		kcConfig.ClientSecret,
+		kcConfig.ClientRealm,
+	)
+}
+
+func gocloakProvider(ctx context.Context, cfg config) (controller.OIDCService, error) {
+	kcConfig, err := getKeycloakConfig(ctx, cfg.GCPSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	// The oauth2/clientcredentials package provides a TokenSource which keeps our Keycloak token
+	// up to date automatically.
+	authConfig := &clientcredentials.Config{
+		ClientID:     kcConfig.ClientId,
+		ClientSecret: kcConfig.ClientSecret,
+		TokenURL: kcConfig.KeycloakUrl.JoinPath(
+			"realms",
+			kcConfig.ClientRealm,
+			"protocol/openid-connect/token",
+		).String(),
+	}
+
+	return keycloak.NewGocloakWrapper(
+		kcConfig.KeycloakUrl.String(),
+		kcConfig.ClientRealm,
+		authConfig.TokenSource(ctx),
+	), nil
+}
+
+func getKeycloakConfig(ctx context.Context, gcpSecret string) (*keycloakConfig, error) {
+	kcConfig := &keycloakConfig{}
+
+	if gcpSecret != "" {
+		if err := readKeycloakConfigFromSecretManager(ctx, gcpSecret, kcConfig); err != nil {
+			return nil, fmt.Errorf("unable to fetch or parse config from secret manager: %w", err)
+		}
+	}
+
+	if err := env.ParseWithOptions(kcConfig, env.Options{
+		Prefix: "KEYCLOAKERATOR_",
+	}); err != nil {
+		return nil, fmt.Errorf("error parsing environment variables: %s", err)
+	}
+
+	if !kcConfig.Valid() {
+		return nil, fmt.Errorf("missing one or more keycloak parameters")
+	}
+
+	return kcConfig, nil
 }
