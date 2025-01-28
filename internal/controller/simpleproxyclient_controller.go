@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -132,6 +133,7 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if client, err = r.oidcService.CreateClient(ctx, CreateClientRequest{
 			Name:         clientId,
 			RedirectURIs: instance.Spec.RedirectUris,
+			Username:     strings.TrimPrefix(req.Namespace, "user-ssb-"),
 		}); err != nil {
 			log.Error(err, "could not create oidc client")
 			return ctrl.Result{}, fmt.Errorf("create client: %w", err)

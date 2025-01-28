@@ -20,6 +20,7 @@ type Client struct {
 
 type CreateClientRequest struct {
 	Name         string
+	Username     string
 	RedirectURIs []string
 }
 

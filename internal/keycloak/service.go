@@ -72,6 +72,21 @@ func (g *GocloakWrapper) CreateClient(ctx context.Context, req controller.Create
 		return nil, fmt.Errorf("create audience mapper: %w", err)
 	}
 
+	userAudience := gocloak.ProtocolMapperRepresentation{
+		Name:           ptr.To(""),
+		Protocol:       ptr.To("openid-connect"),
+		ProtocolMapper: ptr.To("oidc-audience-mapper"),
+		Config: &map[string]string{
+			"id.token.claim":           "true",
+			"access.token.claim":       "true",
+			"included.custom.audience": fmt.Sprintf("user:%s", req.Username),
+		},
+	}
+
+	if _, err = g.createClientProtocolMapper(ctx, internalId, userAudience); err != nil {
+		return nil, fmt.Errorf("create user audience mapper: %w", err)
+	}
+
 	return &controller.Client{
 		ClientID:     *client.ClientID,
 		ClientSecret: *client.Secret,
