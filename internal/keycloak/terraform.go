@@ -23,7 +23,7 @@ func NewTerraformProviderWrapper(ctx context.Context, url, clientId, clientSecre
 		return nil, err
 	}
 
-	return &TerraformProviderWrapper{client: client}, nil
+	return &TerraformProviderWrapper{client: client, realm: realm}, nil
 }
 
 func (k *TerraformProviderWrapper) CreateClient(ctx context.Context, req controller.CreateClientRequest) (*controller.Client, error) {
