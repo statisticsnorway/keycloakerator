@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -48,6 +49,8 @@ const (
 	clientSecretKey = "client-secret"
 	clientIdKey     = "client-id"
 	cookieSecretKey = "cookie-secret"
+
+	daplaGroupAnnotation = "dapla.ssb.no/access-group"
 )
 
 func NewSimpleProxyClientReconciler(mgr manager.Manager, oidcService OIDCService) *SimpleProxyClientReconciler {
@@ -127,10 +130,17 @@ func (r *SimpleProxyClientReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		Name: clientId,
 	})
 
+	group, hasGroup := instance.Annotations[daplaGroupAnnotation]
+	if !hasGroup {
+		group = "UNKNOWN"
+	}
+
 	if errors.Is(err, ErrNotFound) {
 		log.Info("creating keycloak client")
 		if client, err = r.oidcService.CreateClient(ctx, CreateClientRequest{
 			Name:         clientId,
+			DaplaUser:    strings.TrimPrefix(req.Namespace, "user-ssb-"),
+			DaplaGroup:   group,
 			RedirectURIs: instance.Spec.RedirectUris,
 		}); err != nil {
 			log.Error(err, "could not create oidc client")

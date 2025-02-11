@@ -20,6 +20,8 @@ type Client struct {
 
 type CreateClientRequest struct {
 	Name         string
+	DaplaUser    string
+	DaplaGroup   string
 	RedirectURIs []string
 }
 

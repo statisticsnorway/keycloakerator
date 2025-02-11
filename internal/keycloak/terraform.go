@@ -63,6 +63,28 @@ func (k *TerraformProviderWrapper) CreateClient(ctx context.Context, req control
 		return nil, err
 	}
 
+	if err := k.client.NewOpenIdHardcodedClaimProtocolMapper(ctx, &keycloak.OpenIdHardcodedClaimProtocolMapper{
+		AddToIdToken:     true,
+		AddToAccessToken: true,
+		ClientId:         keycloakClient.Id,
+		Name:             "dapla-user",
+		ClaimName:        "dapla.user",
+		ClaimValue:       req.DaplaUser,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := k.client.NewOpenIdHardcodedClaimProtocolMapper(ctx, &keycloak.OpenIdHardcodedClaimProtocolMapper{
+		AddToIdToken:     true,
+		AddToAccessToken: true,
+		ClientId:         keycloakClient.Id,
+		Name:             "dapla-group",
+		ClaimName:        "dapla.group",
+		ClaimValue:       req.DaplaGroup,
+	}); err != nil {
+		return nil, err
+	}
+
 	return &controller.Client{
 		ClientID:     keycloakClient.ClientId,
 		ClientSecret: keycloakClient.ClientSecret,
