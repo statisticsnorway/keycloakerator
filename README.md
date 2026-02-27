@@ -3,6 +3,48 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/statisticsnorway/keycloakerator/blob/main/LICENSE.md)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
 
+## What it does
+
+Keycloakerator is a small Kubernetes controller (operator) that automates the lifecycle
+of Keycloak OpenID Connect clients for services that use a simple auth-proxy pattern.
+It exposes a Custom Resource Definition (CRD) named `SimpleProxyClient` which lets
+you declare the desired redirect URIs and the name of a Kubernetes `Secret` that
+will hold the resulting client credentials.
+
+When a `SimpleProxyClient` is created, the controller will:
+
+- ensure a corresponding client exists in Keycloak (creating it if missing),
+- create or update a Kubernetes `Secret` containing the `client_id`, `client_secret`
+  and a `cookie` secret used by the proxy,
+- set controller ownership so the secret is managed alongside the CR, and
+- cleanup the Keycloak client on CR deletion (via a finalizer).
+
+The Keycloak interaction is implemented via a small wrapper around `gocloak` in
+`internal/keycloak`. The controller itself lives in `internal/controller` and the
+API types and webhook validation are defined under `api/v1alpha1`.
+
+## Background / Why this exists
+
+Manually creating and configuring Keycloak clients for each service is error
+prone and does not fit well with a GitOps / declarative workflow. Keycloakerator
+lets teams declare their client requirements alongside their Kubernetes
+applications so client creation, credentials rotation and cleanup happen
+automatically and reproducibly.
+
+Keycloakerator was created to simplify the common pattern of services sitting
+behind a simple authentication proxy that needs an OIDC client. By managing the
+client and the resulting secret through Kubernetes custom resources, teams get
+consistent client configuration and a clear lifecycle for credentials.
+
+Important operational notes:
+
+- The controller requires a Keycloak client with permissions to manage clients
+  on the target realm (see configuration section below).
+- For testing, a dummy Keycloak implementation can be enabled via
+  the `KEYCLOAK_DUMMY` flag.
+- Example usage: install the CRD from `config/crd/bases` and apply a sample from
+  `config/samples/dapla_v1alpha1_simpleproxyclient.yaml`.
+
 ## Usage
 
 To build and deploy locally you can follow the official Kubebuilder guide: [Running and deploying the controller](https://book.kubebuilder.io/cronjob-tutorial/running).
@@ -33,7 +75,7 @@ Set `KEYCLOAKERATOR_DUMMY=true` in order to run the controller with a Keycloak d
 
 Kubebuilder also bundles a `ENABLE_WEBHOOKS` environment variable. Set this to `false` to disable webhooks (if testing/troubleshooting).
 
-# Contributing
+## Contributing
 
 Please follow these guidelines when contributing.
 
@@ -52,6 +94,7 @@ When working on experimental branches you can use whatever commit messages you w
 Using [Scratchpad branches](https://julien.ponge.org/blog/a-workflow-for-experiments-in-git-scratchpad-branches/) is probably the easiest approach.
 
 Use the provided pre-commit hook to verify your commit messages:
+
 ```sh
 pre-commit install --install-hooks
 pre-commit install -t commit-msg
