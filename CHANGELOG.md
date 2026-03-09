@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.4](https://github.com/statisticsnorway/keycloakerator/compare/v0.2.3...v0.2.4) (2026-03-09)
+
+
+### Bug Fixes
+
+* changed kube-rbac-proxy image location ([#31](https://github.com/statisticsnorway/keycloakerator/issues/31)) ([652e81c](https://github.com/statisticsnorway/keycloakerator/commit/652e81c28af7a6e9ab85d7973797274ddc4a7770))
+* **test:** remove outdated test case ([84392d4](https://github.com/statisticsnorway/keycloakerator/commit/84392d40ba02e9b18feadfb94fb6037537e0ad75))
+
 ## [0.2.3](https://github.com/statisticsnorway/keycloakerator/compare/v0.2.2...v0.2.3) (2024-12-09)
 
 
