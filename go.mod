@@ -1,6 +1,6 @@
 module github.com/statisticsnorway/keycloakerator
 
-go 1.21
+go 1.23.0
 
 require (
 	cloud.google.com/go/secretmanager v1.13.1
@@ -8,7 +8,7 @@ require (
 	github.com/caarlos0/env/v11 v11.0.1
 	github.com/onsi/ginkgo/v2 v2.14.0
 	github.com/onsi/gomega v1.30.0
-	golang.org/x/oauth2 v0.20.0
+	golang.org/x/oauth2 v0.27.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
