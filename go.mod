@@ -1,6 +1,6 @@
 module github.com/statisticsnorway/keycloakerator
 
-go 1.21
+go 1.27.3
 
 require (
 	cloud.google.com/go/secretmanager v1.13.1
