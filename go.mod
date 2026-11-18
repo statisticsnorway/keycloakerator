@@ -7,14 +7,14 @@ require (
 	github.com/Nerzal/gocloak/v13 v13.9.0
 	github.com/caarlos0/env/v11 v11.4.2
 	github.com/onsi/ginkgo/v2 v2.34.0
-	github.com/onsi/gomega v1.40.0
-	golang.org/x/oauth2 v0.37.0
+	github.com/onsi/gomega v1.44.0
+	golang.org/x/oauth2 v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.37.2
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
 	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab
-	sigs.k8s.io/controller-runtime v0.25.2
+	sigs.k8s.io/controller-runtime v0.25.3
 )
 
 require (
