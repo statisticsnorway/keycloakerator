@@ -17,13 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"errors"
 	"slices"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -32,34 +31,35 @@ var simpleproxyclientlog = logf.Log.WithName("simpleproxyclient-resource")
 
 // SetupWebhookWithManager will setup the manager to manage the webhooks
 func (r *SimpleProxyClient) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
+	return ctrl.NewWebhookManagedBy(mgr, r).
+		WithValidator(&SimpleProxyClientValidator{}).
 		Complete()
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-dapla-ssb-no-v1alpha1-simpleproxyclient,mutating=false,failurePolicy=fail,sideEffects=None,groups=dapla.ssb.no,resources=simpleproxyclients,verbs=create;update,versions=v1alpha1,name=vsimpleproxyclient.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &SimpleProxyClient{}
+type SimpleProxyClientValidator struct{}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *SimpleProxyClient) ValidateCreate() (admission.Warnings, error) {
+var _ admission.Validator[*SimpleProxyClient] = &SimpleProxyClientValidator{}
+
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type
+func (v *SimpleProxyClientValidator) ValidateCreate(_ context.Context, r *SimpleProxyClient) (admission.Warnings, error) {
 	simpleproxyclientlog.Info("validate create", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *SimpleProxyClient) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type
+func (v *SimpleProxyClientValidator) ValidateUpdate(_ context.Context, old, r *SimpleProxyClient) (admission.Warnings, error) {
 	simpleproxyclientlog.Info("validate update", "name", r.Name)
 
-	oldSPC, ok := old.(*SimpleProxyClient)
-	if !ok {
+	if old == nil {
 		return nil, errors.New("old object is not a SimpleProxyClient")
 	}
 
-	if isSpecModified(oldSPC.Spec, r.Spec) {
+	if isSpecModified(old.Spec, r.Spec) {
 		return nil, errors.New("SimpleProxyClient is immutable")
 	}
 
@@ -71,8 +71,8 @@ func isSpecModified(old, new SimpleProxyClientSpec) bool {
 		!slices.Equal(old.RedirectUris, new.RedirectUris)
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *SimpleProxyClient) ValidateDelete() (admission.Warnings, error) {
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type
+func (v *SimpleProxyClientValidator) ValidateDelete(_ context.Context, r *SimpleProxyClient) (admission.Warnings, error) {
 	simpleproxyclientlog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.

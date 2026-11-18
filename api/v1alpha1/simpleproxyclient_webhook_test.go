@@ -17,11 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("SimpleProxyClient Webhook", func() {
+	validator := &SimpleProxyClientValidator{}
+	ctx := context.Background()
 
 	DescribeTable("When modyfing fields in SimpleProxyClient under Validating Webhook", func(oldSpec SimpleProxyClientSpec) {
 		spc := &SimpleProxyClient{
@@ -31,7 +35,7 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 			},
 		}
 		old := &SimpleProxyClient{Spec: oldSpec}
-		Expect(spc.ValidateUpdate(old)).Error().Should(HaveOccurred())
+		Expect(validator.ValidateUpdate(ctx, old, spc)).Error().Should(HaveOccurred())
 	},
 		Entry("When RedirectUris is changed", SimpleProxyClientSpec{RedirectUris: []string{"http://localhost2"}, SecretName: "test1"}),
 		Entry("When TargetSecret is changed", SimpleProxyClientSpec{RedirectUris: []string{"http://localhost1"}, SecretName: "test2"}),
@@ -41,7 +45,7 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 		It("Should fail", func() {
 			By("Sending in a nil object")
 			spc := &SimpleProxyClient{}
-			Expect(spc.ValidateUpdate(nil)).Error().Should(HaveOccurred())
+			Expect(validator.ValidateUpdate(ctx, nil, spc)).Error().Should(HaveOccurred())
 		})
 	})
 
@@ -49,7 +53,7 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 		It("Should succeed", func() {
 			By("Sending in the same object")
 			spc := &SimpleProxyClient{}
-			Expect(spc.ValidateUpdate(spc)).Error().ShouldNot(HaveOccurred())
+			Expect(validator.ValidateUpdate(ctx, spc, spc)).Error().ShouldNot(HaveOccurred())
 		})
 	})
 
@@ -58,7 +62,7 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 		spc := &SimpleProxyClient{
 			Spec: spec,
 		}
-		Expect(spc.ValidateCreate()).Error().ShouldNot(HaveOccurred())
+		Expect(validator.ValidateCreate(ctx, spc)).Error().ShouldNot(HaveOccurred())
 	},
 		Entry("When spec is empty", SimpleProxyClientSpec{}),
 		Entry("When spec if filled", SimpleProxyClientSpec{RedirectUris: []string{"http://test"}, SecretName: "test"}),
@@ -70,7 +74,7 @@ var _ = Describe("SimpleProxyClient Webhook", func() {
 		spc := &SimpleProxyClient{
 			Spec: spec,
 		}
-		Expect(spc.ValidateDelete()).Error().ShouldNot(HaveOccurred())
+		Expect(validator.ValidateDelete(ctx, spc)).Error().ShouldNot(HaveOccurred())
 	},
 		Entry("When spec is empty", SimpleProxyClientSpec{}),
 		Entry("When spec if filled", SimpleProxyClientSpec{RedirectUris: []string{"http://test"}, SecretName: "test"}),
