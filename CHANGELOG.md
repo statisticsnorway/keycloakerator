@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/statisticsnorway/keycloakerator/compare/v0.2.4...v0.2.5) (2026-11-19)
+
+
+### Features
+
+* bump dependencies ([3be04f4](https://github.com/statisticsnorway/keycloakerator/commit/3be04f4711ba5fab515daf4465b70e2c2cda48c1))
+
 ## [0.2.4](https://github.com/statisticsnorway/keycloakerator/compare/v0.2.3...v0.2.4) (2026-03-09)
 
 
